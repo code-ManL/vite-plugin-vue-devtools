@@ -25,6 +25,8 @@ const router = useRouter()
 </script>
 
 <template>
+   
+
   {{ appStore.count }}
   <RouterView />
   <!-- <HelloWorld msg="Vite + Vue" /> -->
@@ -38,3 +40,4 @@ const router = useRouter()
     increment
   </button>
 </template>
+

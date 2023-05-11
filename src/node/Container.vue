@@ -1,367 +1,414 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import vueDevtoolsOptions from 'virtual:vue-devtools-options'
+import { useWindowSize, useDraggable } from '@vueuse/core'
 
-const props = defineProps({
-  hook: {
-    type: Object,
-  },
-})
+const el = ref<HTMLElement | null>(null)
+const { width, height } = useWindowSize()
+// `style` will be a helper computed for `left: ?px; top: ?px;`
 
-const DevtoolsHooks = {
-  APP_INIT: 'app:init',
-  COMPONENT_UPDATED: 'component:updated',
-  COMPONENT_ADDED: 'component:added',
-  COMPONENT_REMOVED: 'component:removed',
-  COMPONENT_EMIT: 'component:emit',
-  PERF_START: 'perf:start',
-  PERF_END: 'perf:end',
-  ADD_ROUTE: 'router:add-route',
-  REMOVE_ROUTE: 'router:remove-route',
-}
-
-window.__VUE_DEVTOOLS_GLOBAL_HOOKS__ = function () {
-  return props.hook
-}
-
-const isDragging = ref(false)
-
-document.addEventListener('mouseup', () => {
-  isDragging.value = false
-})
-
-document.addEventListener('mouseleave', () => {
-  isDragging.value = false
-})
-
-const PANEL_MIN = 15
-const PANEL_MAX = 100
-const PANEL_PADDING = 10
-
-const clientUrl = `${vueDevtoolsOptions.base || '/'}__devtools/`
-const iframe = ref()
-const panelState = ref({
-  position: 'bottom',
-  viewMode: 'default',
-})
-const panelVisible = ref(false)
-const hookBuffer = []
-let isAppCreated = false
-
-const panelHight = ref(60)
-const panelWidth = ref(80)
-
-const panelStyle = computed(() => {
-  const height = `calc(${panelHight.value}vh - ${PANEL_PADDING}px)`
-  const width = `calc(${panelWidth.value}vw - ${PANEL_PADDING}px)`
-  if (panelState.value.viewMode === 'component-inspector') {
-    return {
-      bottom: `${PANEL_PADDING}px`,
-      left: '50%',
-      transform: 'translateX(-50%)',
-      height: '80px',
-      width: '400px',
-    }
-  }
-
-  if (panelState.value.position === 'bottom') {
-    return {
-      transform: 'translateX(-50%)',
-      bottom: `${PANEL_PADDING}px`,
-      left: '50%',
-      height,
-      width,
-    }
-  }
-  else if (panelState.value.position === 'top') {
-    return {
-      transform: 'translateX(-50%)',
-      top: `${PANEL_PADDING}px`,
-      left: '50%',
-      height,
-      width,
-    }
-  }
-  else if (panelState.value.position === 'left') {
-    return {
-      transform: 'translateY(-50%)',
-      top: '50%',
-      left: `${PANEL_PADDING}px`,
-      height,
-      width,
-    }
-  }
-  else {
-    return {
-      transform: 'translateY(-50%)',
-      top: '50%',
-      right: `${PANEL_PADDING}px`,
-      height,
-      width,
-    }
-  }
-})
-const toggleButtonPosition = computed(() => {
-  if (panelState.value.position === 'left') {
-    return {
-      'left': '-8px',
-      'top': 'calc(50% - 25px)',
-      'height': '35px',
-      'width': '35px',
-      'borderRadius': '0 100px 100px 0',
-      '--hover-translate': 'translateX(3px)',
-    }
-  }
-  if (panelState.value.position === 'right') {
-    return {
-      'right': '-8px',
-      'top': 'calc(50% - 25px)',
-      'height': '35px',
-      'width': '35px',
-      'borderRadius': '100px 0 0 100px',
-      '--hover-translate': 'translateX(-3px)',
-    }
-  }
-  if (panelState.value.position === 'top') {
-    return {
-      'top': '-3px',
-      'left': 'calc(50% - 25px)',
-      'borderRadius': '0 0 100px 100px',
-      'height': '30px',
-      'width': '40px',
-      '--hover-translate': 'translate(0, 3px)',
-    }
-  }
-  return {
-    'bottom': '-5px',
-    'left': 'calc(50% - 25px)',
-    'borderRadius': '100px 100px 0 0',
-    'height': '30px',
-    'width': '40px',
-    '--hover-translate': 'translate(0, -3px)',
-  }
-})
-const panelPosition = computed(() =>
-  panelVisible.value
-    ? panelStyle.value
-    : { zIndex: -100000, left: '-9999px', top: '-9999px' },
-)
-
-document.addEventListener('mousemove', (e) => {
-  if (!isDragging.value)
-    return
-
-  const alignSide = panelState.value.position === 'left' || panelState.value.position === 'right'
-
-  if (isDragging.value === 'horizontal' || isDragging.value === 'both') {
-    const y = panelState.value.position === 'top'
-      ? window.innerHeight - e.clientY
-      : e.clientY
-    const boxHeight = window.innerHeight
-    const value = alignSide
-      ? (Math.abs(y - (window.innerHeight / 2))) / boxHeight * 100 * 2
-      : (window.innerHeight - y) / boxHeight * 100
-    panelHight.value = Math.min(PANEL_MAX, Math.max(PANEL_MIN, value))
-  }
-
-  if (isDragging.value === 'vertical' || isDragging.value === 'both') {
-    const x = panelState.value.position === 'left'
-      ? window.innerWidth - e.clientX
-      : e.clientX
-    const boxWidth = window.innerWidth
-    const value = alignSide
-      ? (window.innerWidth - x) / boxWidth * 100
-      : (Math.abs(x - (window.innerWidth / 2))) / boxWidth * 100 * 2
-    panelWidth.value = Math.min(PANEL_MAX, Math.max(PANEL_MIN, value))
-  }
-})
-
-function togglePanel() {
-  panelVisible.value = !panelVisible.value
-}
-
-function enableComponentInspector() {
-  window.__VUE_INSPECTOR__?.enable()
-  panelState.value.viewMode = 'component-inspector'
-}
-
-function disableComponentInspector() {
-  window.__VUE_INSPECTOR__?.disable()
-  props.hook.emit('host:inspector:close')
-  if (panelState.value.viewMode === 'component-inspector')
-    panelState.value.viewMode = 'default'
-}
-
-function waitForClientInjection(retry = 50, timeout = 200) {
-  const test = () => !!iframe.value?.contentWindow?.__VUE_DEVTOOLS_VIEW__ && isAppCreated
-
-  if (test())
-    return
-
-  return new Promise((resolve, reject) => {
-    const interval = setInterval(() => {
-      if (test()) {
-        clearInterval(interval)
-        resolve()
+const { x, y, style } = useDraggable(el, {
+  initialValue: { x: width.value - 400, y: height.value / 2 },
+  onMove: (position) => {
+      if (position.x > width.value - 40) {
+        position.x = width.value - 40
       }
-      else if (retry-- <= 0) {
-        clearInterval(interval)
-        // eslint-disable-next-line prefer-promise-reject-errors
-        reject('Vue Devtools client injection failed')
+      if (position.x < 0) {
+        position.x = 0
       }
-    }, timeout)
-  })
-}
-
-async function onLoad() {
-  await waitForClientInjection()
-  setupClient()
-}
-
-function setupClient() {
-  const injection = iframe.value?.contentWindow?.__VUE_DEVTOOLS_VIEW__
-  const componentInspector = window.__VUE_INSPECTOR__
-  if (componentInspector) {
-    const _openInEditor = componentInspector.openInEditor
-    componentInspector.openInEditor = async (...params) => {
-      disableComponentInspector()
-      _openInEditor(...params)
-    }
+      if (position.y > height.value - 40) {
+        position.y = height.value - 40
+      }
+      if (position.y < 0) {
+        position.y = 0
+      }
   }
-  injection.setClient({
-    hook: props.hook,
-    hookBuffer,
-    inspector: {
-      enable: enableComponentInspector,
-      disable: disableComponentInspector,
-    },
-    panel: {
-      toggle: togglePanel,
-      togglePosition(position) {
-        panelState.value.position = position
-      },
-    },
-  })
-}
-
-function initPanelPosition() {
-  const frameState = localStorage.getItem('__vue-devtools-frame-state__')
-  if (frameState) {
-    const parsedFrameState = JSON.parse(frameState)
-    panelState.value.position = parsedFrameState.position
-  }
-}
-
-function captureDynamicRoute(app) {
-  const router = app?.config?.globalProperties?.$router
-  if (!router)
-    return
-
-  const _addRoute = router.addRoute
-  router.addRoute = (...args) => {
-    const res = _addRoute(...args)
-
-    if (!iframe.value?.contentWindow?.__VUE_DEVTOOLS_VIEW__?.loaded) {
-      hookBuffer.push([DevtoolsHooks.ADD_ROUTE, {
-        args: [...args],
-      }])
-    }
-
-    return res
-  }
-
-  const _removeRoute = router.removeRoute
-  router.removeRoute = (...args) => {
-    const res = _removeRoute(...args)
-
-    if (!iframe.value?.contentWindow?.__VUE_DEVTOOLS_VIEW__?.loaded) {
-      hookBuffer.push([DevtoolsHooks.REMOVE_ROUTE, {
-        args: [...args],
-      }])
-    }
-
-    return res
-  }
-}
-
-function collectHookBuffer() {
-  let sortId = 0
-
-  function stopCollect(component) {
-    return component?.root?.type?.devtools?.hide || iframe.value?.contentWindow?.__VUE_DEVTOOLS_VIEW__?.loaded
-  }
-
-  props.hook.on(DevtoolsHooks.APP_INIT, (app) => {
-    if (!app || app._instance.type?.devtools?.hide)
-      return
-
-    captureDynamicRoute(app)
-    hookBuffer.push([DevtoolsHooks.APP_INIT, {
-      app,
-    }])
-    setTimeout(() => {
-      isAppCreated = true
-    }, 80)
-  })
-
-  props.hook.on(DevtoolsHooks.PERF_START, (app, uid, component, type, time) => {
-    if (stopCollect(component))
-      return
-
-    hookBuffer.push([DevtoolsHooks.PERF_START, {
-      now: Date.now(),
-      app,
-      uid,
-      component,
-      type,
-      time,
-      sortId: sortId++,
-    }])
-  })
-  props.hook.on(DevtoolsHooks.PERF_END, (app, uid, component, type, time) => {
-    if (stopCollect(component))
-      return
-
-    hookBuffer.push([DevtoolsHooks.PERF_END, {
-      now: Date.now(),
-      app,
-      uid,
-      component,
-      type,
-      time,
-      sortId: sortId++,
-    }])
-  });
-
-  [
-    DevtoolsHooks.COMPONENT_UPDATED,
-    DevtoolsHooks.COMPONENT_ADDED,
-    DevtoolsHooks.COMPONENT_REMOVED,
-    DevtoolsHooks.COMPONENT_EMIT,
-  ].forEach((item) => {
-    props.hook.on(item, (app, uid, parentUid, component) => {
-      if (!app || (typeof uid !== 'number' && !uid) || !component || stopCollect(component))
-        return
-      hookBuffer.push([item, {
-        app, uid, parentUid, component,
-      }])
-    })
-  })
-}
-
-onMounted(() => {
-  window.addEventListener('keydown', (e) => {
-    if (e.code === 'KeyD' && e.altKey && e.shiftKey)
-      togglePanel()
-  })
 })
 
-collectHookBuffer()
-initPanelPosition()
+// const props = defineProps({
+//   hook: {
+//     type: Object,
+//   },
+// })
+
+// const DevtoolsHooks = {
+//   APP_INIT: 'app:init',
+//   COMPONENT_UPDATED: 'component:updated',
+//   COMPONENT_ADDED: 'component:added',
+//   COMPONENT_REMOVED: 'component:removed',
+//   COMPONENT_EMIT: 'component:emit',
+//   PERF_START: 'perf:start',
+//   PERF_END: 'perf:end',
+//   ADD_ROUTE: 'router:add-route',
+//   REMOVE_ROUTE: 'router:remove-route',
+// }
+
+// window.__VUE_DEVTOOLS_GLOBAL_HOOKS__ = function () {
+//   return props.hook
+// }
+
+// const isDragging = ref(false)
+
+// // document.addEventListener('mouseup', () => {
+// //   isDragging.value = false
+// // })
+
+// // document.addEventListener('mouseleave', () => {
+// //   isDragging.value = false
+// // })
+
+// const PANEL_MIN = 15
+// const PANEL_MAX = 100
+// const PANEL_PADDING = 10
+
+// const clientUrl = `${vueDevtoolsOptions.base || '/'}__devtools/`
+// const iframe = ref()
+// const panelState = ref({
+//   position: 'bottom',
+//   viewMode: 'default',
+// })
+// const panelVisible = ref(false)
+// const hookBuffer = []
+// let isAppCreated = false
+
+// const panelHight = ref(60)
+// const panelWidth = ref(80)
+
+// const panelStyle = computed(() => {
+//   const height = `calc(${panelHight.value}vh - ${PANEL_PADDING}px)`
+//   const width = `calc(${panelWidth.value}vw - ${PANEL_PADDING}px)`
+//   if (panelState.value.viewMode === 'component-inspector') {
+//     return {
+//       bottom: `${PANEL_PADDING}px`,
+//       left: '50%',
+//       transform: 'translateX(-50%)',
+//       height: '80px',
+//       width: '400px',
+//     }
+//   }
+
+//   if (panelState.value.position === 'bottom') {
+//     return {
+//       transform: 'translateX(-50%)',
+//       bottom: `${PANEL_PADDING}px`,
+//       left: '50%',
+//       height,
+//       width,
+//     }
+//   }
+//   else if (panelState.value.position === 'top') {
+//     return {
+//       transform: 'translateX(-50%)',
+//       top: `60px`,
+//       left: '50%',
+//       height,
+//       width,
+//     }
+//   }
+//   else if (panelState.value.position === 'left') {
+//     return {
+//       transform: 'translateY(-50%)',
+//       top: '50%',
+//       left: `${PANEL_PADDING}px`,
+//       height,
+//       width,
+//     }
+//   }
+//   else if(panelState.value.position === 'drag'){
+//     return {
+//       transform: 'translateX(-50%)',
+//       top: `${PANEL_PADDING}px`,
+//       left: '50%',
+//       height,
+//       width,
+//     }
+//   }
+//   else {
+//     return {
+//       transform: 'translateY(-50%)',
+//       top: '50%',
+//       right: `${PANEL_PADDING}px`,
+//       height,
+//       width,
+//     }
+//   }
+// })
+// const toggleButtonPosition = computed(() => {
+//   if (panelState.value.position === 'left') {
+//     return {
+//       'left': '-8px',
+//       'top': 'calc(50% - 25px)',
+//       'height': '35px',
+//       'width': '35px',
+//       'borderRadius': '0 100px 100px 0',
+//       '--hover-translate': 'translateX(3px)',
+//     }
+//   }
+//   if (panelState.value.position === 'right') {
+//     return {
+//       'right': '-8px',
+//       'top': 'calc(50% - 25px)',
+//       'height': '35px',
+//       'width': '35px',
+//       'borderRadius': '100px 0 0 100px',
+//       '--hover-translate': 'translateX(-3px)',
+//     }
+//   }
+//   if (panelState.value.position === 'top') {
+//     return {
+//       'top': '20px',
+//       'left': 'calc(50% - 25px)',
+//       'borderRadius': '100px',
+//       'height': '40px',
+//       'width': '40px',
+//       '--hover-translate': 'translate(0, 3px)',
+//     }
+//   }
+
+//   if(panelState.value.position === 'drag'){
+//     return {
+//       'top': '-3px',
+//       'left': 'calc(50% - 25px)',
+//       'borderRadius': '0 0 100px 100px',
+//       'height': '30px',
+//       'width': '40px',
+//       '--hover-translate': 'translate(0, 3px)',
+//     }
+//   }
+
+//   return {
+//     'bottom': '-5px',
+//     'left': 'calc(50% - 25px)',
+//     'borderRadius': '100px 100px 0 0',
+//     'height': '30px',
+//     'width': '40px',
+//     '--hover-translate': 'translate(0, -3px)',
+//   }
+// })
+// const panelPosition = computed(() =>
+//   panelVisible.value
+//     ? panelStyle.value
+//     : { zIndex: -100000, left: '-9999px', top: '-9999px' },
+// )
+
+// document.addEventListener('mousemove', (e) => {
+//   if (!isDragging.value)
+//     return
+
+//   const alignSide = panelState.value.position === 'left' || panelState.value.position === 'right'
+
+//   if (isDragging.value === 'horizontal' || isDragging.value === 'both') {
+//     const y = panelState.value.position === 'top'
+//       ? window.innerHeight - e.clientY
+//       : e.clientY
+//     const boxHeight = window.innerHeight
+//     const value = alignSide
+//       ? (Math.abs(y - (window.innerHeight / 2))) / boxHeight * 100 * 2
+//       : (window.innerHeight - y) / boxHeight * 100
+//     panelHight.value = Math.min(PANEL_MAX, Math.max(PANEL_MIN, value))
+//   }
+
+//   if (isDragging.value === 'vertical' || isDragging.value === 'both') {
+//     const x = panelState.value.position === 'left'
+//       ? window.innerWidth - e.clientX
+//       : e.clientX
+//     const boxWidth = window.innerWidth
+//     const value = alignSide
+//       ? (window.innerWidth - x) / boxWidth * 100
+//       : (Math.abs(x - (window.innerWidth / 2))) / boxWidth * 100 * 2
+//     panelWidth.value = Math.min(PANEL_MAX, Math.max(PANEL_MIN, value))
+//   }
+// })
+
+// function togglePanel() {
+//   panelVisible.value = !panelVisible.value
+// }
+
+// function enableComponentInspector() {
+//   window.__VUE_INSPECTOR__?.enable()
+//   panelState.value.viewMode = 'component-inspector'
+// }
+
+// function disableComponentInspector() {
+//   window.__VUE_INSPECTOR__?.disable()
+//   props.hook.emit('host:inspector:close')
+//   if (panelState.value.viewMode === 'component-inspector')
+//     panelState.value.viewMode = 'default'
+// }
+
+// function waitForClientInjection(retry = 50, timeout = 200) {
+//   const test = () => !!iframe.value?.contentWindow?.__VUE_DEVTOOLS_VIEW__ && isAppCreated
+
+//   if (test())
+//     return
+
+//   return new Promise((resolve, reject) => {
+//     const interval = setInterval(() => {
+//       if (test()) {
+//         clearInterval(interval)
+//         resolve()
+//       }
+//       else if (retry-- <= 0) {
+//         clearInterval(interval)
+//         // eslint-disable-next-line prefer-promise-reject-errors
+//         reject('Vue Devtools client injection failed')
+//       }
+//     }, timeout)
+//   })
+// }
+
+// async function onLoad() {
+//   await waitForClientInjection()
+//   setupClient()
+// }
+
+// function setupClient() {
+//   const injection = iframe.value?.contentWindow?.__VUE_DEVTOOLS_VIEW__
+//   const componentInspector = window.__VUE_INSPECTOR__
+//   if (componentInspector) {
+//     const _openInEditor = componentInspector.openInEditor
+//     componentInspector.openInEditor = async (...params) => {
+//       disableComponentInspector()
+//       _openInEditor(...params)
+//     }
+//   }
+//   injection.setClient({
+//     hook: props.hook,
+//     hookBuffer,
+//     inspector: {
+//       enable: enableComponentInspector,
+//       disable: disableComponentInspector,
+//     },
+//     panel: {
+//       toggle: togglePanel,
+//       togglePosition(position) {
+//         panelState.value.position = position
+//       },
+//     },
+//   })
+// }
+
+// function initPanelPosition() {
+//   const frameState = localStorage.getItem('__vue-devtools-frame-state__')
+//   if (frameState) {
+//     const parsedFrameState = JSON.parse(frameState)
+//     panelState.value.position = parsedFrameState.position
+//   }
+// }
+
+// function captureDynamicRoute(app) {
+//   const router = app?.config?.globalProperties?.$router
+//   if (!router)
+//     return
+
+//   const _addRoute = router.addRoute
+//   router.addRoute = (...args) => {
+//     const res = _addRoute(...args)
+
+//     if (!iframe.value?.contentWindow?.__VUE_DEVTOOLS_VIEW__?.loaded) {
+//       hookBuffer.push([DevtoolsHooks.ADD_ROUTE, {
+//         args: [...args],
+//       }])
+//     }
+
+//     return res
+//   }
+
+//   const _removeRoute = router.removeRoute
+//   router.removeRoute = (...args) => {
+//     const res = _removeRoute(...args)
+
+//     if (!iframe.value?.contentWindow?.__VUE_DEVTOOLS_VIEW__?.loaded) {
+//       hookBuffer.push([DevtoolsHooks.REMOVE_ROUTE, {
+//         args: [...args],
+//       }])
+//     }
+
+//     return res
+//   }
+// }
+
+// function collectHookBuffer() {
+//   let sortId = 0
+
+//   function stopCollect(component) {
+//     return component?.root?.type?.devtools?.hide || iframe.value?.contentWindow?.__VUE_DEVTOOLS_VIEW__?.loaded
+//   }
+
+//   props.hook.on(DevtoolsHooks.APP_INIT, (app) => {
+//     if (!app || app._instance.type?.devtools?.hide)
+//       return
+
+//     captureDynamicRoute(app)
+//     hookBuffer.push([DevtoolsHooks.APP_INIT, {
+//       app,
+//     }])
+//     setTimeout(() => {
+//       isAppCreated = true
+//     }, 80)
+//   })
+
+//   props.hook.on(DevtoolsHooks.PERF_START, (app, uid, component, type, time) => {
+//     if (stopCollect(component))
+//       return
+
+//     hookBuffer.push([DevtoolsHooks.PERF_START, {
+//       now: Date.now(),
+//       app,
+//       uid,
+//       component,
+//       type,
+//       time,
+//       sortId: sortId++,
+//     }])
+//   })
+//   props.hook.on(DevtoolsHooks.PERF_END, (app, uid, component, type, time) => {
+//     if (stopCollect(component))
+//       return
+
+//     hookBuffer.push([DevtoolsHooks.PERF_END, {
+//       now: Date.now(),
+//       app,
+//       uid,
+//       component,
+//       type,
+//       time,
+//       sortId: sortId++,
+//     }])
+//   });
+
+//   [
+//     DevtoolsHooks.COMPONENT_UPDATED,
+//     DevtoolsHooks.COMPONENT_ADDED,
+//     DevtoolsHooks.COMPONENT_REMOVED,
+//     DevtoolsHooks.COMPONENT_EMIT,
+//   ].forEach((item) => {
+//     props.hook.on(item, (app, uid, parentUid, component) => {
+//       if (!app || (typeof uid !== 'number' && !uid) || !component || stopCollect(component))
+//         return
+//       hookBuffer.push([item, {
+//         app, uid, parentUid, component,
+//       }])
+//     })
+//   })
+// }
+
+// onMounted(() => {
+//   window.addEventListener('keydown', (e) => {
+//     if (e.code === 'KeyD' && e.altKey && e.shiftKey)
+//       togglePanel()
+//   })
+// })
+
+
+
+// collectHookBuffer()
+// initPanelPosition()
+
 </script>
 
 <template>
-  <div class="vue-devtools-panel" :style="panelPosition">
+  <!-- <div class="vue-devtools-panel" :style="panelPosition">
     <iframe ref="iframe" :src="clientUrl" :style="{
       'pointer-events': isDragging ? 'none' : 'auto',
     }" @load="onLoad" />
@@ -388,21 +435,33 @@ initPanelPosition()
         class="vue-devtools-resize-handle vue-devtools-resize-handle-corner"
         :style="{ bottom: 0, left: 0, cursor: 'nesw-resize' }" @mousedown.prevent="() => isDragging = 'both'" />
     </template>
+  </div> -->
+  <div ref = "el" class = "my" :style="style">
+      👋 Drag me!
+      I am at {{ x }}, {{ y}}
   </div>
-  <button class="vue-devtools-toggle" aria-label="Toggle devtools panel" :style="toggleButtonPosition"
+  <!-- <button class="vue-devtools-toggle" aria-label="Toggle devtools panel" :style="toggleButtonPosition"
     @click.prevent="togglePanel">
     <svg viewBox="0 0 256 198" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path fill="#41B883" d="M204.8 0H256L128 220.8L0 0h97.92L128 51.2L157.44 0h47.36Z" />
       <path fill="#41B883" d="m0 0l128 220.8L256 0h-51.2L128 132.48L50.56 0H0Z" />
       <path fill="#35495E" d="M50.56 0L128 133.12L204.8 0h-47.36L128 51.2L97.92 0H50.56Z" />
     </svg>
-  </button>
+  </button> -->
 </template>
 
 <style scoped>
+
+.my {
+  border-radius: 10px;
+  background-color:rgb(114, 108, 108);
+  position: fixed;
+  cursor: move; 
+  touch-action:none;
+}
 .vue-devtools-panel {
   position: fixed;
-  z-index: 2147483647;
+  z-index: 2147483645;
   width: calc(80vw - 20px);
   height: calc(60vh - 20px);
 }
