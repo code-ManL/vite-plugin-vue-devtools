@@ -11,41 +11,37 @@ function initGroups() {
     1: 'modules',
     2: 'advanced',
   }
+  console.log(categories.value)
+
+  const wrap = (evt, i: number, isAdd: boolean) => {
+    const dataKey = (evt.item as HTMLElement).getAttribute('data-key')?.split('-')
+    const newList = categories.value[i][1]
+    const oldList = isAdd ? categories.value[Object.keys(MappingKeys).find(key => MappingKeys[key] === dataKey![0])!][1] : newList
+    if (oldList.length === 1)
+      return
+
+    const innerMove = {
+      newIndex: evt.newIndex,
+      oldIndex: evt.oldIndex,
+      categories: categories.value,
+    }
+    newList.splice(innerMove.newIndex, 0, oldList.splice(innerMove.oldIndex, 1)[0])
+
+    useSortCategories(
+      Number(dataKey![1]),
+      MappingKeys[i],
+      innerMove)
+  }
+
   for (let i = 0; i < len; i++) {
     new Sortable(sortList[i], {
       group: 'shared',
-      onAdd: function (evt) {
-        const dataKey = (evt.item as HTMLElement).getAttribute('data-key')?.split('-')
-        const innerMove = {
-          newIndex: evt.newIndex,
-          oldIndex: evt.oldIndex,
-          oldList: categories.value[Object.keys(MappingKeys).find(key => MappingKeys[key] === dataKey![0])!][1],
-          newList: categories.value[i][1]
-        }
-
-        console.log(innerMove.newIndex);
-        console.log(innerMove.oldIndex);
-        console.log(innerMove.newList);
-        console.log(innerMove.oldList);
-
-        useSortCategories(
-          Number(dataKey![1]),
-          MappingKeys[i],
-          innerMove)
+      onAdd(evt) {
+        wrap(evt, i, true)
       },
-      onUpdate: function (evt) {
-        const dataKey = (evt.item as HTMLElement).getAttribute('data-key')?.split('-')
-
-        const innerMove = {
-          newIndex: evt.newIndex,
-          oldIndex: evt.oldIndex,
-          oldList: categories.value[i][1]
-        }
-        useSortCategories(
-          Number(dataKey![1]),
-          MappingKeys[i],
-          innerMove)
-      }
+      onUpdate(evt) {
+        wrap(evt, i, false)
+      },
     })
   }
 }
@@ -71,10 +67,12 @@ onMounted(() => {
       <template v-for="[name, tabs], idx of categories" :key="name">
         <template v-if="tabs.length">
           <div v-if="idx" my1 h-1px w-8 border="b base" />
-          <div :ref="(el) => {
-            sortList[idx] = el as HTMLElement
-          }" :class="[`sortEl${idx}`]">
-            <SideNavItem :data-key="`${name}-${tab.key}`" v-for="tab of tabs" :key="tab.path" :tab="tab" />
+          <div
+            :ref="(el) => {
+              sortList[idx] = el as HTMLElement
+            }" :class="[`sortEl${idx}`]"
+          >
+            <SideNavItem v-for="tab of tabs" :key="tab.key" :data-key="`${name}-${tab.key}`" :tab="tab" />
           </div>
         </template>
       </template>
@@ -83,8 +81,10 @@ onMounted(() => {
 
     <div flex="~ none col items-center">
       <div h-1px w-8 border="b base" />
-      <RouterLink replace to="/settings" flex="~ items-center justify-center" hover="bg-active" relative my1 block h-10
-        w-10 select-none rounded-xl p1 text-secondary exact-active-class="!text-primary bg-active">
+      <RouterLink
+        replace to="/settings" flex="~ items-center justify-center" hover="bg-active" relative my1 block h-10
+        w-10 select-none rounded-xl p1 text-secondary exact-active-class="!text-primary bg-active"
+      >
         <TabIcon text-xl icon="i-carbon-settings" title="Settings" :show-title="false" />
       </RouterLink>
     </div>

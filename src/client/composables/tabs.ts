@@ -143,7 +143,6 @@ export function useCategorizedTabs(enabledOnly = true) {
   const tabs = enabledOnly
     ? _tabs.enabled
     : _tabs.all
-
   const settings = useDevToolsSettings()
 
   return computed(() => {
@@ -171,30 +170,20 @@ export function useSortCategories(
   key: BuiltinTabKey,
   toCateGory: string,
   innerMoveOptions: {
-    newIndex: number,
-    oldIndex: number,
-    oldList: BuiltinTab[]
-    newList?: BuiltinTab[]
+    newIndex: number
+    oldIndex: number
+    categories: any[]
   }) {
   const res = builtinTabs.find(tab => tab.key === key)
   if (res) {
-    // if (res.category === toCateGory && innerMoveOptions) {
-    const newTab = innerMoveOptions.newList ? innerMoveOptions.newList[innerMoveOptions.newIndex] : innerMoveOptions.oldList[innerMoveOptions.newIndex]
-    const oldTab = innerMoveOptions.oldList[innerMoveOptions.oldIndex]
-    const idxAry: number[] = []
-    for (const [index, tab] of builtinTabs.entries()) {
-      if (tab.key === newTab.key || tab.key === oldTab.key) {
-        idxAry.push(index)
-      }
-    }
-    if (!innerMoveOptions.newList) {
-      const temp = builtinTabs[idxAry[0]];
-      builtinTabs[idxAry[0]] = builtinTabs[idxAry[1]];
-      builtinTabs[idxAry[1]] = temp;
-    } else {
-      // TODO
-    }
     res.category = toCateGory
+    const temp = innerMoveOptions.categories.reduce((pre, cur) => {
+      pre.push(...cur[1])
+      return pre
+    }, [])
+    // const temp = [...innerMoveOptions.categories[0][1], ...innerMoveOptions.categories[1][1], ...innerMoveOptions.categories[2][1]]
+    builtinTabs.length = 0
+    builtinTabs.splice(0, 0, ...temp)
   }
   localStorage.setItem('vite-plugin-vue-devtools:builtinTabs', JSON.stringify(builtinTabs))
 }
