@@ -20,7 +20,7 @@ export enum BuiltinTabKey {
 
 const localBuiltinTabs = localStorage.getItem('vite-plugin-vue-devtools:builtinTabs')
 
-const builtinTabs: BuiltinTab[] = (localBuiltinTabs && JSON.parse(localBuiltinTabs)) || [
+const builtinTabs: BuiltinTab[] = reactive((localBuiltinTabs && JSON.parse(localBuiltinTabs)) || [
   {
     path: 'overview',
     title: 'Overview',
@@ -40,15 +40,16 @@ const builtinTabs: BuiltinTab[] = (localBuiltinTabs && JSON.parse(localBuiltinTa
     title: 'Components',
     category: 'app',
     icon: 'i-carbon-assembly-cluster',
-    key: BuiltinTabKey.COMPONENTS_KEY
+    key: BuiltinTabKey.COMPONENTS_KEY,
   },
   {
     path: 'assets',
     title: 'Assets',
     category: 'app',
     icon: 'i-carbon-image-copy',
-    key: BuiltinTabKey.ASSETS_KEY
+    key: BuiltinTabKey.ASSETS_KEY,
   },
+
   {
     path: 'timeline',
     title: 'Timeline',
@@ -88,21 +89,21 @@ const builtinTabs: BuiltinTab[] = (localBuiltinTabs && JSON.parse(localBuiltinTa
       router.replace('/__eyedropper')
       client.panel?.toggleViewMode('xs')
     },
-    key: BuiltinTabKey.EyeDropper_KEY
+    key: BuiltinTabKey.EyeDropper_KEY,
   },
   {
     title: 'Component docs',
     path: 'component-docs',
     icon: 'i-carbon-document-preliminary',
     category: 'advanced',
-    key: BuiltinTabKey.COMPONENT_DOCS_KEY
+    key: BuiltinTabKey.COMPONENT_DOCS_KEY,
   },
   {
     path: 'npm',
     title: 'Search packages',
     icon: 'i-teenyicons:npm-outline',
     category: 'advanced',
-    key: BuiltinTabKey.NPM_KEY
+    key: BuiltinTabKey.NPM_KEY,
   },
   {
     title: 'Graph',
@@ -125,7 +126,7 @@ const builtinTabs: BuiltinTab[] = (localBuiltinTabs && JSON.parse(localBuiltinTa
     category: 'advanced',
     key: BuiltinTabKey.DOCUMENTATIONS_KEY,
   },
-]
+])
 
 export function useTabs() {
   const settings = useDevToolsSettings()
@@ -166,8 +167,34 @@ export function useCategorizedTabs(enabledOnly = true) {
   })
 }
 
-export function useSortCategories(key: BuiltinTabKey, toCateGory: string) {
+export function useSortCategories(
+  key: BuiltinTabKey,
+  toCateGory: string,
+  innerMoveOptions: {
+    newIndex: number,
+    oldIndex: number,
+    oldList: BuiltinTab[]
+    newList?: BuiltinTab[]
+  }) {
   const res = builtinTabs.find(tab => tab.key === key)
-  res && (res.category = toCateGory)
+  if (res) {
+    // if (res.category === toCateGory && innerMoveOptions) {
+    const newTab = innerMoveOptions.newList ? innerMoveOptions.newList[innerMoveOptions.newIndex] : innerMoveOptions.oldList[innerMoveOptions.newIndex]
+    const oldTab = innerMoveOptions.oldList[innerMoveOptions.oldIndex]
+    const idxAry: number[] = []
+    for (const [index, tab] of builtinTabs.entries()) {
+      if (tab.key === newTab.key || tab.key === oldTab.key) {
+        idxAry.push(index)
+      }
+    }
+    if (!innerMoveOptions.newList) {
+      const temp = builtinTabs[idxAry[0]];
+      builtinTabs[idxAry[0]] = builtinTabs[idxAry[1]];
+      builtinTabs[idxAry[1]] = temp;
+    } else {
+      // TODO
+    }
+    res.category = toCateGory
+  }
   localStorage.setItem('vite-plugin-vue-devtools:builtinTabs', JSON.stringify(builtinTabs))
 }

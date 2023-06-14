@@ -9,14 +9,43 @@ function initGroups() {
   const MappingKeys = {
     0: 'app',
     1: 'modules',
-    2: 'advanced'
+    2: 'advanced',
   }
   for (let i = 0; i < len; i++) {
     new Sortable(sortList[i], {
       group: 'shared',
       onAdd: function (evt) {
-        useSortCategories(Number((evt.item as HTMLElement).getAttribute('data-key')), MappingKeys[i])
+        const dataKey = (evt.item as HTMLElement).getAttribute('data-key')?.split('-')
+        const innerMove = {
+          newIndex: evt.newIndex,
+          oldIndex: evt.oldIndex,
+          oldList: categories.value[Object.keys(MappingKeys).find(key => MappingKeys[key] === dataKey![0])!][1],
+          newList: categories.value[i][1]
+        }
+
+        console.log(innerMove.newIndex);
+        console.log(innerMove.oldIndex);
+        console.log(innerMove.newList);
+        console.log(innerMove.oldList);
+
+        useSortCategories(
+          Number(dataKey![1]),
+          MappingKeys[i],
+          innerMove)
       },
+      onUpdate: function (evt) {
+        const dataKey = (evt.item as HTMLElement).getAttribute('data-key')?.split('-')
+
+        const innerMove = {
+          newIndex: evt.newIndex,
+          oldIndex: evt.oldIndex,
+          oldList: categories.value[i][1]
+        }
+        useSortCategories(
+          Number(dataKey![1]),
+          MappingKeys[i],
+          innerMove)
+      }
     })
   }
 }
@@ -45,7 +74,7 @@ onMounted(() => {
           <div :ref="(el) => {
             sortList[idx] = el as HTMLElement
           }" :class="[`sortEl${idx}`]">
-            <SideNavItem :data-key="`${tab.key}`" v-for="tab of tabs" :key="tab.path" :tab="tab" />
+            <SideNavItem :data-key="`${name}-${tab.key}`" v-for="tab of tabs" :key="tab.path" :tab="tab" />
           </div>
         </template>
       </template>
